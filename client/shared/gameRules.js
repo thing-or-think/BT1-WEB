@@ -35,6 +35,22 @@
     BLUE: { row: 0, col: 8, notation: 'i9' }
   });
 
+  // Tọa độ ô đặc biệt (Special Power Cells / Ô Thần Lực)
+  // e5: tâm bàn cờ 9x9 (row 4, col 4)
+  const SPECIAL_CELLS = Object.freeze([
+    { row: 4, col: 4, notation: 'e5', name: 'Ô Thần Lực' }
+  ]);
+
+  /**
+   * Kiểm tra toạ độ có phải là ô đặc biệt không
+   * @param {number} r
+   * @param {number} c
+   * @returns {boolean}
+   */
+  function isSpecialCell(r, c) {
+    return SPECIAL_CELLS.some(cell => cell.row === r && cell.col === c);
+  }
+
   // 8 hướng di chuyển (4 trực giao + 4 chéo)
   const DIRECTIONS = Object.freeze([
     { dr: -1, dc: 0, name: 'UP' },
@@ -56,12 +72,33 @@
 
   /**
    * Kiểm tra quân tấn công có ăn được quân bị tấn công không
-   * @param {string} attackerType - Loại quân tấn công (ROCK/PAPER/SCISSORS)
-   * @param {string} defenderType - Loại quân bị tấn công
+   * @param {string|Object} attacker - Loại quân hoặc object quân tấn công
+   * @param {string|Object} defender - Loại quân hoặc object quân bị tấn công
    * @returns {boolean}
    */
-  function canCapture(attackerType, defenderType) {
-    if (!attackerType || !defenderType) return false;
+  function canCapture(attacker, defender) {
+    if (!attacker || !defender) return false;
+
+    const attackerType = typeof attacker === 'object' ? attacker.type : attacker;
+    const defenderType = typeof defender === 'object' ? defender.type : defender;
+    const isAttackerEmpowered = typeof attacker === 'object' ? !!attacker.isEmpowered : false;
+    const isDefenderEmpowered = typeof defender === 'object' ? !!defender.isEmpowered : false;
+
+    // QUY TẮC QUÂN THẦN LỰC (ĐÃ ĂN CHỨC NĂNG Ô ĐẶC BIỆT):
+    // 1. Nếu quân bị tấn công (defender) là quân Thần Lực:
+    //    -> Quân thường ("không ăn ô đặc biệt") KHÔNG THỂ ăn được nó!
+    //    -> Chỉ có quân cũng có Thần Lực mới ăn được quân Thần Lực!
+    if (isDefenderEmpowered) {
+      return isAttackerEmpowered;
+    }
+
+    // 2. Nếu quân tấn công (attacker) là quân Thần Lực:
+    //    -> Ăn được mọi quân phòng thủ thường bất kể Đấm, Kéo hay Lá!
+    if (isAttackerEmpowered) {
+      return true;
+    }
+
+    // 3. Cả hai đều là quân thường: Tuân theo luật Oẳn Tù Tì chuẩn
     return BEATS[attackerType] === defenderType;
   }
 
@@ -163,6 +200,7 @@
     if (!piece) return [];
 
     const validMoves = [];
+    const isFromSpecial = isSpecialCell(fromRow, fromCol);
 
     for (const dir of DIRECTIONS) {
       const toRow = fromRow + dir.dr;
@@ -171,6 +209,7 @@
       if (!isValidPosition(toRow, toCol)) continue;
 
       const targetPiece = board[toRow][toCol];
+      const isToSpecial = isSpecialCell(toRow, toCol);
 
       if (!targetPiece) {
         // Ô trống: Đi được 1 ô theo hướng bất kỳ
@@ -186,8 +225,13 @@
           // Cùng phe: Không thể đi vào
           continue;
         } else {
-          // Khác phe: Kiểm tra luật Oẳn Tù Tì
-          if (canCapture(piece.type, targetPiece.type)) {
+          // Khác phe:
+          // Nếu quân đang đứng ở ô đặc biệt thì tạm thời kích hoạt Thần Lực
+          const effectiveAttacker = (isFromSpecial && !piece.isEmpowered)
+            ? { ...piece, isEmpowered: true }
+            : piece;
+
+          if (canCapture(effectiveAttacker, targetPiece)) {
             validMoves.push({
               row: toRow,
               col: toCol,
@@ -347,6 +391,8 @@
     SIDES,
     PIECE_TYPES,
     BASES,
+    SPECIAL_CELLS,
+    isSpecialCell,
     DIRECTIONS,
     BEATS,
     canCapture,

@@ -23,6 +23,10 @@ class ClientBoard {
     const movedPiece = this.grid[from.row][from.col];
     const capturedPiece = this.grid[to.row][to.col];
 
+    if (movedPiece && GameRules.isSpecialCell && GameRules.isSpecialCell(to.row, to.col)) {
+      movedPiece.isEmpowered = true;
+    }
+
     this.grid[to.row][to.col] = movedPiece;
     this.grid[from.row][from.col] = null;
 

@@ -44,6 +44,11 @@ class ClientRules {
         score += 1000;
       }
 
+      // 1.5. Nếu chiếm được Ô Thần Lực (e5) -> Rất giá trị (+80 điểm)
+      if (GameRules.isSpecialCell && GameRules.isSpecialCell(move.to.row, move.to.col)) {
+        score += 80;
+      }
+
       // 2. Nếu ăn được quân đối phương -> Điểm cao (+50 điểm)
       if (move.isCapture) {
         score += 50;

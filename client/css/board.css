@@ -108,6 +108,53 @@
   pointer-events: none;
 }
 
+/* Ô Thần Lực Đặc Biệt (e5) */
+.cell.special-power-cell {
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.32) 0%, #262c36 80%) !important;
+  border: 1.5px solid #f59e0b !important;
+  box-shadow: inset 0 0 12px rgba(245, 158, 11, 0.35);
+  animation: pulse-special-cell 3s infinite ease-in-out;
+}
+
+@keyframes pulse-special-cell {
+  0%, 100% {
+    box-shadow: inset 0 0 10px rgba(245, 158, 11, 0.3), 0 0 8px rgba(245, 158, 11, 0.25);
+  }
+  50% {
+    box-shadow: inset 0 0 16px rgba(245, 158, 11, 0.6), 0 0 14px rgba(245, 158, 11, 0.5);
+  }
+}
+
+.cell.special-power-cell::before {
+  content: "⚡ e5";
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-size: 8px;
+  font-weight: 900;
+  color: #fbbf24;
+  pointer-events: none;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+.special-cell-icon {
+  font-size: 1.3rem;
+  color: #fbbf24;
+  opacity: 0.8;
+  filter: drop-shadow(0 0 6px #f59e0b);
+  animation: float-spin 4s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes float-spin {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.15);
+  }
+}
+
 /* Ô đang được chọn */
 .cell.selected {
   background-color: #3b4252 !important;
@@ -179,6 +226,50 @@
 
 .cell:hover .piece {
   transform: scale(1.06);
+}
+
+/* Quân có Thần Lực (Empowered Piece) */
+.piece.empowered {
+  border-radius: 50%;
+  box-shadow: 0 0 16px #f59e0b, inset 0 0 6px rgba(255, 255, 255, 0.7);
+  animation: empowered-pulse 2s infinite alternate ease-in-out;
+  position: relative;
+}
+
+@keyframes empowered-pulse {
+  0% {
+    box-shadow: 0 0 10px #f59e0b;
+    filter: drop-shadow(0 0 4px #fbbf24);
+  }
+  100% {
+    box-shadow: 0 0 22px #fbbf24, 0 0 35px rgba(245, 158, 11, 0.7);
+    filter: drop-shadow(0 0 8px #f59e0b);
+  }
+}
+
+.empowered-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 8px #f59e0b;
+  border: 1.5px solid #fff;
+  z-index: 5;
+  animation: badge-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes badge-pop {
+  0% { transform: scale(0); }
+  100% { transform: scale(1); }
 }
 
 /* Toạ độ ngoài viền bàn cờ */

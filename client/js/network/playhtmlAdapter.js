@@ -1,6 +1,7 @@
 /**
  * PlayhtmlAdapter: Quản lý đồng bộ trạng thái phòng chơi OTTv2 thời gian thực không cần Server
- * Sử dụng thư viện playhtml (PartyKit & Yjs CRDT) và hỗ trợ WebRTC/BroadcastChannel dự phòng.
+ * Hỗ trợ WebRTC P2P (PeerJS) kết nối trực tiếp qua Internet giữa 2 máy tính / điện thoại bất kỳ,
+ * kèm BroadcastChannel và LocalStorage làm dự phòng tức thì cho cùng máy.
  */
 class PlayhtmlAdapter {
   constructor() {
@@ -13,23 +14,30 @@ class PlayhtmlAdapter {
     this.roomState = null;
     this.broadcastChannel = null;
     this.storageKey = null;
+
+    // WebRTC P2P (PeerJS)
+    this.peer = null;
+    this.activeConnection = null;
+    this.isP2PConnected = false;
   }
 
   /**
-   * Khởi tạo phòng chơi Serverless
+   * Khởi tạo phòng chơi P2P Serverless
    * @param {string} roomId Mã định danh phòng
    * @param {string} playerName Tên người chơi
    * @param {boolean} isHost Người tạo phòng (true) hay Người vào phòng (false)
    * @param {Array} initialBoard Ma trận bàn cờ 9x9 ban đầu
    */
   async init(roomId, playerName, isHost = false, initialBoard = null) {
+    this.destroy(); // Dọn dẹp kết nối cũ nếu có
+
     this.roomId = roomId;
     this.isHost = isHost;
     this.mySide = isHost ? 'RED' : 'BLUE';
     this.playerName = playerName;
     this.storageKey = `ottv2_room_${roomId}`;
 
-    // Khởi tạo BroadcastChannel để đồng bộ tức thì giữa các tab cùng trình duyệt
+    // 1. Khởi tạo BroadcastChannel để đồng bộ tức thì nếu mở nhiều tab cùng máy
     try {
       if (typeof BroadcastChannel !== 'undefined') {
         this.broadcastChannel = new BroadcastChannel(`ottv2_${roomId}`);
@@ -45,7 +53,7 @@ class PlayhtmlAdapter {
       console.warn('BroadcastChannel not supported:', e);
     }
 
-    // Lắng nghe sự kiện storage cho tab
+    // 2. Lắng nghe sự kiện storage cho tab
     window.addEventListener('storage', (e) => {
       if (e.key === this.storageKey && e.newValue) {
         try {
@@ -55,7 +63,7 @@ class PlayhtmlAdapter {
       }
     });
 
-    // Khởi tạo trạng thái ban đầu
+    // 3. Khởi tạo trạng thái ban đầu
     if (isHost || !this.roomState) {
       this.roomState = {
         roomId: this.roomId,
@@ -73,8 +81,9 @@ class PlayhtmlAdapter {
       this._loadLocalState();
     }
 
-    // Khởi tạo thư viện playhtml nếu có sẵn
-    this._initPlayhtmlSync();
+    // 4. Khởi tạo WebRTC P2P (PeerJS) kết nối qua Internet giữa 2 máy
+    const cleanRoomCode = roomId.toLowerCase().replace(/[^a-z0-9]/g, '');
+    this._initPeerJSSync(cleanRoomCode, isHost);
 
     this.isInitialized = true;
     this._trigger('room:ready', {
@@ -85,7 +94,7 @@ class PlayhtmlAdapter {
       shareUrl: this.getShareUrl()
     });
 
-    // Thông báo cho phòng biết có người mới vào
+    // Thông báo cục bộ
     if (!isHost) {
       this.roomState.guestName = this.playerName;
       this.syncState(this.roomState);
@@ -93,30 +102,139 @@ class PlayhtmlAdapter {
   }
 
   /**
-   * Kết nối với playhtml (nếu đã load thư viện)
+   * Khởi tạo kết nối WebRTC P2P qua PeerJS
    */
-  _initPlayhtmlSync() {
-    if (typeof playhtml !== 'undefined' && playhtml.init) {
+  _initPeerJSSync(cleanRoomCode, isHost) {
+    if (typeof Peer === 'undefined') {
+      console.warn('[P2P] Thư viện PeerJS chưa sẵn sàng.');
+      return;
+    }
+
+    const peerConfig = {
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+      }
+    };
+
+    const hostPeerId = `ottv2-${cleanRoomCode}`;
+
+    if (isHost) {
+      // Máy Host: Đăng ký Peer với ID phòng
       try {
-        playhtml.init({
-          room: `ottv2_${this.roomId}`
+        this.peer = new Peer(hostPeerId, peerConfig);
+
+        this.peer.on('open', (id) => {
+          console.log('[P2P] Chủ phòng đã mở PeerID:', id);
+          this._trigger('p2p:ready', { peerId: id, isHost: true });
         });
 
-        // Đăng ký custom element sync với playhtml
-        if (playhtml.register) {
-          playhtml.register('ottv2-sync-hub', {
-            defaultData: this.roomState,
-            updateElement: (element, data) => {
-              if (data && data.version > (this.roomState?.version || 0)) {
-                this._handleIncomingState(data);
-              }
-            }
+        this.peer.on('connection', (conn) => {
+          console.log('[P2P] Đối thủ đã kết nối vào phòng của Host');
+          this.activeConnection = conn;
+          this._setupConnection(conn, true);
+        });
+
+        this.peer.on('error', (err) => {
+          console.warn('[P2P] Lỗi Peer Host:', err);
+          if (err.type === 'unavailable-id') {
+            this._trigger('p2p:error', {
+              message: 'Mã phòng này đang có người sử dụng. Hãy thử tạo mã phòng mới!'
+            });
+          }
+        });
+      } catch (e) {
+        console.warn('[P2P] Lỗi khởi tạo Host:', e);
+      }
+    } else {
+      // Máy Guest: Tạo Peer ngẫu nhiên và kết nối tới Host
+      try {
+        this.peer = new Peer(null, peerConfig);
+
+        this.peer.on('open', (id) => {
+          console.log('[P2P] Khách đã mở PeerID:', id, 'đang kết nối tới Host:', hostPeerId);
+          const conn = this.peer.connect(hostPeerId, { reliable: true });
+          this.activeConnection = conn;
+          this._setupConnection(conn, false);
+        });
+
+        this.peer.on('error', (err) => {
+          console.warn('[P2P] Lỗi Peer Guest:', err);
+          this._trigger('p2p:error', {
+            message: 'Không tìm thấy hoặc không thể kết nối tới phòng của Host. Vui lòng kiểm tra mã phòng!'
           });
-        }
-      } catch (err) {
-        console.warn('playhtml init error (falling back to P2P/Broadcast):', err);
+        });
+      } catch (e) {
+        console.warn('[P2P] Lỗi khởi tạo Guest:', e);
       }
     }
+  }
+
+  /**
+   * Thiết lập các sự kiện trên DataChannel P2P
+   */
+  _setupConnection(conn, isHost) {
+    conn.on('open', () => {
+      console.log('[P2P] WebRTC DataChannel đã mở thành công!');
+      this.isP2PConnected = true;
+
+      if (!isHost) {
+        // Khách gửi thông tin tham gia
+        conn.send({
+          type: 'PLAYER_JOIN',
+          guestName: this.playerName
+        });
+      } else {
+        // Chủ phòng gửi trạng thái bàn cờ hiện tại
+        conn.send({
+          type: 'SYNC_STATE',
+          state: this.roomState
+        });
+      }
+
+      this._trigger('p2p:connected', { isHost });
+    });
+
+    conn.on('data', (data) => {
+      if (!data || typeof data !== 'object') return;
+
+      switch (data.type) {
+        case 'PLAYER_JOIN':
+          if (isHost) {
+            this.roomState.guestName = data.guestName || 'Đối thủ (Xanh)';
+            this.syncState(this.roomState);
+            this._trigger('player:joined', { guestName: data.guestName });
+          }
+          break;
+
+        case 'SYNC_STATE':
+          this._handleIncomingState(data.state);
+          break;
+
+        case 'CHAT_MSG':
+          this._trigger('chat:receive', data.chat);
+          break;
+
+        case 'GAME_RESET':
+          this._handleIncomingState(data.state);
+          this._trigger('game:reset', data.state);
+          break;
+      }
+    });
+
+    conn.on('close', () => {
+      console.log('[P2P] Kết nối P2P đã đóng');
+      this.isP2PConnected = false;
+      this._trigger('p2p:disconnected', {});
+    });
+
+    conn.on('error', (err) => {
+      console.warn('[P2P] DataChannel error:', err);
+    });
   }
 
   /**
@@ -129,20 +247,25 @@ class PlayhtmlAdapter {
 
     this._saveLocalState();
 
-    // 1. Đồng bộ qua BroadcastChannel (cho cùng máy / đa tab)
+    // 1. Đồng bộ qua WebRTC P2P (giữa 2 máy tính / điện thoại qua Internet)
+    if (this.activeConnection && this.activeConnection.open) {
+      try {
+        this.activeConnection.send({
+          type: 'SYNC_STATE',
+          state: this.roomState
+        });
+      } catch (e) {
+        console.warn('[P2P] Gửi state thất bại:', e);
+      }
+    }
+
+    // 2. Đồng bộ qua BroadcastChannel (cho cùng máy / đa tab)
     if (this.broadcastChannel) {
       try {
         this.broadcastChannel.postMessage({
           type: 'SYNC_STATE',
           state: this.roomState
         });
-      } catch (e) {}
-    }
-
-    // 2. Đồng bộ qua playhtml cloud
-    if (typeof playhtml !== 'undefined' && playhtml.setData) {
-      try {
-        playhtml.setData('ottv2-sync-hub', this.roomState);
       } catch (e) {}
     }
   }
@@ -172,7 +295,7 @@ class PlayhtmlAdapter {
     this.roomState = newState;
     this._saveLocalState();
 
-    // Kích hoạt sự kiện cập nhật
+    // Kích hoạt sự kiện cập nhật giao diện
     this._trigger('state:updated', {
       roomState: this.roomState,
       previousState
@@ -212,6 +335,15 @@ class PlayhtmlAdapter {
       timestamp: Date.now()
     };
 
+    if (this.activeConnection && this.activeConnection.open) {
+      try {
+        this.activeConnection.send({
+          type: 'CHAT_MSG',
+          chat: chatData
+        });
+      } catch (e) {}
+    }
+
     if (this.broadcastChannel) {
       try {
         this.broadcastChannel.postMessage({
@@ -239,6 +371,16 @@ class PlayhtmlAdapter {
     };
 
     this.syncState(updated);
+
+    if (this.activeConnection && this.activeConnection.open) {
+      try {
+        this.activeConnection.send({
+          type: 'GAME_RESET',
+          state: updated
+        });
+      } catch (e) {}
+    }
+
     this._trigger('game:reset', updated);
   }
 
@@ -249,6 +391,25 @@ class PlayhtmlAdapter {
     const url = new URL(window.location.href);
     url.searchParams.set('room', this.roomId);
     return url.toString();
+  }
+
+  /**
+   * Hủy kết nối P2P và dọn dẹp tài nguyên
+   */
+  destroy() {
+    if (this.activeConnection) {
+      try { this.activeConnection.close(); } catch (e) {}
+      this.activeConnection = null;
+    }
+    if (this.peer) {
+      try { this.peer.destroy(); } catch (e) {}
+      this.peer = null;
+    }
+    if (this.broadcastChannel) {
+      try { this.broadcastChannel.close(); } catch (e) {}
+      this.broadcastChannel = null;
+    }
+    this.isP2PConnected = false;
   }
 
   // --- HỆ THỐNG EVENT EMITTER ---
@@ -262,7 +423,13 @@ class PlayhtmlAdapter {
   _trigger(event, data) {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
-      listeners.forEach(cb => cb(data));
+      listeners.forEach(cb => {
+        try {
+          cb(data);
+        } catch (e) {
+          console.error(`Lỗi listener cho sự kiện ${event}:`, e);
+        }
+      });
     }
   }
 }

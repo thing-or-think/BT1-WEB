@@ -105,8 +105,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const notationFrom = GameRules.posToNotation(from.row, from.col);
       const notationTo = GameRules.posToNotation(to.row, to.col);
-      const notation = `${notationFrom} ➔ ${notationTo}${moveResult.capturedPiece ? ' (Ăn quân)' : ''}`;
+      const isSpecial = GameRules.isSpecialCell && GameRules.isSpecialCell(to.row, to.col);
+      const notation = `${notationFrom} ➔ ${notationTo}${moveResult.capturedPiece ? ' (Ăn quân)' : ''}${isSpecial ? ' ⚡[Ô Thần Lực]' : ''}`;
       addMoveToHistory(currentTurn, notation);
+
+      if (isSpecial) {
+        showToast(`⚡ ${currentTurn === GameRules.SIDES.RED ? 'Phe Đỏ' : 'Phe Xanh'} đã chiếm Ô Thần Lực (e5)! Quân cờ có thể ăn mọi loại quân!`, 'warning');
+      }
 
       const nextSide = currentTurn === GameRules.SIDES.RED ? GameRules.SIDES.BLUE : GameRules.SIDES.RED;
       const gameOverResult = ClientRules.checkGameOver(board.grid, nextSide);
@@ -138,7 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
       // Ghi lịch sử
       const notationFrom = GameRules.posToNotation(from.row, from.col);
       const notationTo = GameRules.posToNotation(to.row, to.col);
-      addMoveToHistory(currentTurn, `${notationFrom} ➔ ${notationTo}${moveResult.capturedPiece ? ' (Ăn quân)' : ''}`);
+      const isSpecial = GameRules.isSpecialCell && GameRules.isSpecialCell(to.row, to.col);
+      addMoveToHistory(currentTurn, `${notationFrom} ➔ ${notationTo}${moveResult.capturedPiece ? ' (Ăn quân)' : ''}${isSpecial ? ' ⚡[Ô Thần Lực]' : ''}`);
+
+      if (isSpecial) {
+        showToast(`⚡ ${currentTurn === GameRules.SIDES.RED ? 'Phe Đỏ' : 'Phe Xanh'} đã chiếm Ô Thần Lực (e5)! Quân cờ có thể ăn mọi loại quân!`, 'warning');
+      }
 
       // Kiểm tra thắng thua
       const nextSide = currentTurn === GameRules.SIDES.RED ? GameRules.SIDES.BLUE : GameRules.SIDES.RED;
@@ -184,7 +194,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const notationFrom = GameRules.posToNotation(bestMove.from.row, bestMove.from.col);
     const notationTo = GameRules.posToNotation(bestMove.to.row, bestMove.to.col);
-    addMoveToHistory(GameRules.SIDES.BLUE, `${notationFrom} ➔ ${notationTo}${moveResult.capturedPiece ? ' (Ăn quân)' : ''}`);
+    const isSpecial = GameRules.isSpecialCell && GameRules.isSpecialCell(bestMove.to.row, bestMove.to.col);
+    addMoveToHistory(GameRules.SIDES.BLUE, `${notationFrom} ➔ ${notationTo}${moveResult.capturedPiece ? ' (Ăn quân)' : ''}${isSpecial ? ' ⚡[Ô Thần Lực]' : ''}`);
+
+    if (isSpecial) {
+      showToast('⚡ Bot AI đã chiếm được Ô Thần Lực (e5)! Hãy cẩn thận!', 'warning');
+    }
 
     // Kiểm tra kết thúc sau nước đi của AI
     const gameOverResult = ClientRules.checkGameOver(board.grid, GameRules.SIDES.RED);
@@ -410,6 +425,22 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Phòng chơi đã được làm mới để bắt đầu ván mới!', 'success');
   });
 
+  playhtmlAdapter.on('p2p:connected', ({ isHost }) => {
+    showToast(isHost ? '🎉 Đối thủ đã kết nối P2P vào phòng của bạn!' : '🎉 Đã kết nối thành công với chủ phòng P2P!', 'success');
+  });
+
+  playhtmlAdapter.on('player:joined', ({ guestName }) => {
+    showToast(`👋 ${guestName} đã vào phòng thi đấu!`, 'info');
+  });
+
+  playhtmlAdapter.on('p2p:disconnected', () => {
+    showToast('⚠️ Đối thủ đã ngắt kết nối hoặc đóng trang!', 'warning');
+  });
+
+  playhtmlAdapter.on('p2p:error', ({ message }) => {
+    showToast(message, 'error');
+  });
+
   // 9. LẮNG NGHE SỰ KIỆN TỪ SOCKET.IO
   socketClient.on('connection_change', ({ isConnected }) => {
     if (connectionStatus) {
@@ -479,6 +510,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     addMoveToHistory(moveRecord.side, moveRecord.notation);
+    if (GameRules.isSpecialCell && GameRules.isSpecialCell(moveRecord.to.row, moveRecord.to.col)) {
+      showToast(`⚡ ${moveRecord.side === GameRules.SIDES.RED ? 'Phe Đỏ' : 'Phe Xanh'} đã chiếm Ô Thần Lực (e5)!`, 'warning');
+    }
     currentTurn = nextTurn;
     updateTurnUI();
     updateTimerDisplay(turnTimeRemaining);

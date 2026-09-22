@@ -43,11 +43,14 @@ class BoardRenderer {
         cell.dataset.row = r;
         cell.dataset.col = c;
 
-        // Đánh dấu ô căn cứ
+        // Đánh dấu ô căn cứ và ô đặc biệt
         if (r === GameRules.BASES.RED.row && c === GameRules.BASES.RED.col) {
           cell.classList.add('base-red');
         } else if (r === GameRules.BASES.BLUE.row && c === GameRules.BASES.BLUE.col) {
           cell.classList.add('base-blue');
+        } else if (GameRules.isSpecialCell && GameRules.isSpecialCell(r, c)) {
+          cell.classList.add('special-power-cell');
+          cell.setAttribute('title', '⚡ Ô Thần Lực (e5): Đi vào có thể ăn mọi con bất kể quân gì!');
         }
 
         cell.addEventListener('click', () => {
@@ -97,6 +100,9 @@ class BoardRenderer {
         if (pieceData) {
           const pieceDiv = document.createElement('div');
           pieceDiv.className = `piece ${pieceData.side.toLowerCase()}`;
+          if (pieceData.isEmpowered) {
+            pieceDiv.classList.add('empowered');
+          }
 
           const img = document.createElement('img');
           img.src = CONFIG.PIECE_ASSETS[pieceData.side][pieceData.type];
@@ -104,7 +110,25 @@ class BoardRenderer {
           img.draggable = false;
 
           pieceDiv.appendChild(img);
+
+          // Nếu quân đã kích hoạt Thần Lực -> Hiển thị huy hiệu sét hoàng kim
+          if (pieceData.isEmpowered) {
+            const badge = document.createElement('span');
+            badge.className = 'empowered-badge';
+            badge.textContent = '⚡';
+            badge.title = 'Quân Thần Lực: Có thể ăn mọi loại quân đối phương!';
+            pieceDiv.appendChild(badge);
+          }
+
           cellDom.appendChild(pieceDiv);
+        } else {
+          // Ô trống đặc biệt: Hiển thị biểu tượng thần lực phát sáng
+          if (GameRules.isSpecialCell && GameRules.isSpecialCell(r, c)) {
+            const powerIcon = document.createElement('div');
+            powerIcon.className = 'special-cell-icon';
+            powerIcon.innerHTML = '⚡';
+            cellDom.appendChild(powerIcon);
+          }
         }
       }
     }

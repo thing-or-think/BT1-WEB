@@ -6,7 +6,8 @@ const {
   createInitialBoard,
   isValidPosition,
   cloneBoard,
-  countPieces
+  countPieces,
+  isSpecialCell
 } = require('../../shared/gameRules');
 
 class Board {
@@ -61,6 +62,11 @@ class Board {
     if (!movedPiece) return null;
 
     const capturedPiece = this.grid[toRow][toCol];
+
+    // Nếu đi vào ô đặc biệt, quân nhận được Thần Lực (ăn mọi quân cờ)
+    if (movedPiece && isSpecialCell && isSpecialCell(toRow, toCol)) {
+      movedPiece.isEmpowered = true;
+    }
 
     // Di chuyển quân
     this.grid[toRow][toCol] = movedPiece;

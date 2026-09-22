@@ -63,8 +63,8 @@
 
         <div class="mode-card highlight" id="btn-mode-playhtml">
           <div class="mode-icon">🌐</div>
-          <h3>Tạo Phòng Serverless</h3>
-          <p>Chơi Online qua link mời (playhtml) trực tiếp trên GitHub Pages không cần Server!</p>
+          <h3>Tạo Phòng P2P (Chơi 2 Máy)</h3>
+          <p>Chơi Online đối đầu giữa 2 máy qua mạng (WebRTC P2P) trực tiếp trên GitHub Pages không cần Server!</p>
           <button class="btn btn-success" style="width: 100%; margin-top: auto;">➕ Tạo Phòng & Lấy Link</button>
         </div>
 
@@ -235,7 +235,12 @@
         <h4 style="color: #60a5fa; margin: 16px 0 6px;">2. Quy tắc Di Chuyển:</h4>
         <p>• Mỗi lượt đi đúng <strong>1 ô</strong> theo <strong>8 hướng</strong> (Tiến, lùi, trái, phải, và 4 đường chéo).</p>
 
-        <h4 style="color: #60a5fa; margin: 16px 0 6px;">3. Điều Kiện Chiến Thắng:</h4>
+        <h4 style="color: #f59e0b; margin: 16px 0 6px;">⚡ 3. Ô Thần Lực Đặc Biệt (e5):</h4>
+        <p>• Tọa lạc tại <strong>trung tâm bàn cờ 9x9 (ô e5)</strong>.<br>
+           • Quân cờ khi di chuyển vào ô này sẽ nhận được <strong>Thần Lực Hoàng Kim (⚡)</strong>: Có thể <strong>ăn bất kỳ quân đối phương nào</strong> bất kể đó là Đấm, Kéo hay Lá!<br>
+           • 🛡️ <strong>Bảo Vệ Thần Lực</strong>: Những quân thường (không ăn ô đặc biệt) <strong>KHÔNG THỂ ăn được</strong> quân đã ăn ô đặc biệt! Chỉ quân cũng mang Thần Lực mới có thể tiêu diệt được quân Thần Lực.</p>
+
+        <h4 style="color: #60a5fa; margin: 16px 0 6px;">4. Điều Kiện Chiến Thắng:</h4>
         <p>• 🚩 <strong>Chiếm Căn Cứ</strong>: Đưa bất kỳ 1 quân nào vào căn cứ đối phương (Đỏ chiếm <code>i9</code>, Xanh chiếm <code>a1</code>).<br>
            • ⚔️ <strong>Diệt Sạch</strong>: Bắt hết 9 quân của đối phương.<br>
            • 🚫 <strong>Khóa nước</strong>: Đối phương không còn nước đi hợp lệ.<br>
@@ -258,7 +263,6 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
   <!-- Shared Rules (Tương thích cả Client và Server) -->
-  <script src="../shared/gameRules.js"></script>
   <script src="shared/gameRules.js"></script>
 
   <!-- Core Modules -->
@@ -273,8 +277,8 @@
   <script src="js/ui/controls.js"></script>
 
   <!-- Network Modules -->
-  <!-- Thư viện playhtml Serverless Multiplayer (PartyKit & Yjs) -->
-  <script src="https://unpkg.com/playhtml@latest/dist/playhtml.min.js"></script>
+  <!-- Thư viện PeerJS WebRTC (P2P Real-time DataChannel không cần Server) -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="js/network/playhtmlAdapter.js"></script>
   <script src="js/network/socketClient.js"></script>
   <script src="js/network/playfullAdapter.js"></script>
