@@ -140,10 +140,11 @@ class PlayhtmlAdapter {
 
     // Tạo state tạm thời trong lúc chờ kết nối với Host
     const local = this._loadLocalState();
+    const fallbackTimePerTurn = 30;
     this.roomState = local || {
       roomId: this.roomId,
       roomName: `Phòng #${this.roomId.slice(-4).toUpperCase()}`,
-      timePerTurn: 30,
+      timePerTurn: fallbackTimePerTurn,
       status: 'WAITING',
       hostId: null,
       hostName: 'Chủ phòng',
@@ -160,6 +161,10 @@ class PlayhtmlAdapter {
       version: 1,
       updatedAt: Date.now()
     };
+
+    if (this.roomState && Number(this.roomState.timePerTurn) <= 0) {
+      this.roomState.timePerTurn = fallbackTimePerTurn;
+    }
 
     // Khởi tạo PeerJS kết nối tới Host
     if (typeof Peer !== 'undefined') {

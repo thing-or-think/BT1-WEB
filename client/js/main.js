@@ -204,7 +204,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // 6. ĐỒNG HỒ ĐẾM NGƯỢC LƯỢT ĐI (TURN TIMER)
   function startLocalTimer(timeLimit) {
     stopLocalTimer();
-    localTimeRemaining = timeLimit || CONFIG.DEFAULT_TURN_TIME;
+
+    const roomTimeLimit = currentMode === CONFIG.GAME_MODES.PLAYHTML
+      ? playhtmlAdapter.roomState?.timePerTurn
+      : null;
+    const resolvedLimit = Number(timeLimit ?? roomTimeLimit ?? CONFIG.DEFAULT_TURN_TIME);
+    localTimeRemaining = Number.isFinite(resolvedLimit) && resolvedLimit > 0
+      ? resolvedLimit
+      : CONFIG.DEFAULT_TURN_TIME;
+
     updateTimerDisplay(localTimeRemaining);
 
     localTimerInterval = setInterval(() => {
@@ -429,6 +437,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (roomState.gameOver) {
         handleGameOver(roomState.gameOver.winner, roomState.gameOver.message);
       }
+    } else {
+      const waitingTime = Number(roomState.timePerTurn) || CONFIG.DEFAULT_TURN_TIME;
+      updateTimerDisplay(waitingTime);
     }
 
     // Phân quyền click
@@ -451,7 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentTurn = data.currentTurn || GameRules.SIDES.RED;
     resetGameBoard();
     gameOverModal.classList.remove('active');
-    startLocalTimer(data.timePerTurn);
+    startLocalTimer(data.timePerTurn ?? playhtmlAdapter.roomState?.timePerTurn ?? CONFIG.DEFAULT_TURN_TIME);
     const canMove = (currentTurn === mySide) && (mySide !== null);
     controls.setGameState(currentTurn, mySide, canMove);
     showToast('Ván đấu mới đã bắt đầu!', 'success');
